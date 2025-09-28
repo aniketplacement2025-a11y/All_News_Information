@@ -16,15 +16,33 @@ class _HomeScreenState extends State<HomeScreen> {
   );
   late Future<List<Article>> _articlesFuture;
 
+  String _selectedCategory = 'general';
+
+  final List<String> _categories = [
+    'general',
+    'entertainment',
+    'business',
+    'health',
+    'science',
+    'sports',
+    'technology',
+  ];
+
   @override
   void initState() {
     super.initState();
-    _articlesFuture = _newsApi.getTopHeadlines();
+    // _articlesFuture = _newsApi.getTopHeadlines();
+    _fetchArticles();
+  }
+
+  void _fetchArticles() {
+    _articlesFuture = _newsApi.getTopHeadlines(category: _selectedCategory);
   }
 
   Future<void> _refreshArticles() async {
     setState(() {
-      _articlesFuture = _newsApi.getTopHeadlines();
+      // _articlesFuture = _newsApi.getTopHeadlines();
+      _fetchArticles();
     });
     // wait for completion so RefreshIndicator finishes nicely
     await _articlesFuture;
@@ -123,6 +141,25 @@ class _HomeScreenState extends State<HomeScreen> {
           'All News Information',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          DropdownButton<String>(
+            value: _selectedCategory,
+            items: _categories.map((String category) {
+              return DropdownMenuItem<String>(
+                value: category,
+                child: Text(category),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              if (newValue != null) {
+                setState(() {
+                  _selectedCategory = newValue;
+                  _fetchArticles();
+                });
+              }
+            },
+          ),
+        ],
         centerTitle: true,
       ),
       body: FutureBuilder<List<Article>>(
