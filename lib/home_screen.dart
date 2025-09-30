@@ -235,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     if (article.publishedAt != null)
                                       Text(
                                         // simple formatting: date only
-                                        '${article.publishedAt!.toLocal().toIso8601String().split('T').first}',
+                                        article.publishedAt!.toLocal().toIso8601String().split('T').first,
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                   ],
