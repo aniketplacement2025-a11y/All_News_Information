@@ -147,6 +147,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.network(
+            'https://icon.horse/icon/newsapi.org',
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.article); // Fallback icon
+            },
+          ),
+        ),
         title: const Text(
           'All News Information',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -169,7 +178,41 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
+          //Old Drop Down Button
+          // IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
+          //New Drop Down Button
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'personal_info':
+                  // TODO: Implement navigation to Personal Info screen
+                  print('Personal Info selected');
+                  break;
+                case 'corrections':
+                  // TODO: Implement navigation to Corrections screen
+                  print('Corrections selected');
+                  break;
+                case 'sign_out':
+                  _signOut();
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'personal_info',
+                child: Text('Personal Info'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'corrections',
+                child: Text('Corrections in Personal Info'),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'sign_out',
+                child: Text('Sign Out'),
+              ),
+            ],
+          ),
         ],
         centerTitle: true,
       ),
