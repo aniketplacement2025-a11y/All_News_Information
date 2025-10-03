@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
+import 'profile_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _profileService = ProfileService();
   bool _isLoading = false; // ADD LOADING STATE
 
   Future<void> _login() async {
@@ -28,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         if (response.user != null) {
           // VERIFY USER EXISTS IN PUBLIC.USERS TABLE
-          await _verifyUserInPublicTable(response.user!.id);
+          await _verifyUserInPublicTables(response.user!);
 
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -51,17 +53,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // ADD VERIFICATION METHOD
-  Future<void> _verifyUserInPublicTable(String userId) async {
+  Future<void> _verifyUserInPublicTables(User user) async {
     try {
-      final data = await Supabase.instance.client
-          .from('users')
-          .select()
-          .eq('id', userId)
-          .single();
-
-      print('✅ Login successful - User found in public.users: $data');
+      final profile = await _profileService.getCompleteUserProfile(user.id);
+      if (profile != null) {
+        print('✅ Login successful - User found in public tables: $profile');
+      } else {
+        print('⚠️ User not found in public tables, but auth login successful');
+      }
     } catch (e) {
-      print('⚠️ User not found in public.users: $e');
+      print('⚠️ Error checking public tables: $e');
     }
   }
 
@@ -98,7 +99,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
               ),
               const SizedBox(height: 20),
-              ElevatedButton(onPressed: _login, child: const Text('Login')),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _login,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Login'),
+              ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).push(

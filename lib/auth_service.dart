@@ -13,22 +13,45 @@ class AuthService {
   Future<AuthResponse> signUp({
     required String email,
     required String password,
+    String? firstName,
+    String? lastName,
+    String? phoneNo,
   }) async {
     final authResponse = await _auth.signUp(email: email, password: password);
-    if (authResponse.user != null) {
-      // Then automatically insert into public.users
+    final user = authResponse.user;
+    if (user == null)
+      throw Exception('User creation failed - no user returned');
+    else {
       try {
-        await Supabase.instance.client
-            .from('users')
-            .insert({
-              'id': authResponse.user!.id,
-              'email': email,
-              'created_at': DateTime.now().toIso8601String(),
-            });
-        print('✅ User successfully added to public.users');
+        // 2. Wait a moment for auth to fully complete
+        await Future.delayed(const Duration(seconds: 1));
+        // Insert into public.users table
+        await Supabase.instance.client.from('users').insert({
+          'id': user.id,
+          'email': user.email!,
+        });
+
+        // Insert into public.profile table
+        await Supabase.instance.client.from('profile').insert({
+          'email': user.email!,
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone_no': phoneNo,
+          // first_name, last_name, etc., can be added here
+          // if they are collected during sign-up
+        });
+
+        print('✅ User created and profile initialized in public tables.');
       } catch (e) {
-        print('⚠️ Could not add to public.users: $e');
-        // Continue anyway - auth user is created successfully
+        print('Error setting up user profile: $e');
+        // If anything fails after auth user creation, we should clean up
+        if (e is AuthException &&
+            e.message.contains('User already registered')) {
+          // This is fine - user exists in auth but maybe public tables failed
+          rethrow;
+        }
+        // Rethrow a more specific exception to be handled by the UI
+        throw Exception('Failed to set up user profile.');
       }
     }
     return authResponse;
@@ -37,4 +60,8 @@ class AuthService {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+  // Simple auth state check
+  User? get currentUser => _auth.currentUser;
+  // Auth state changes stream
+  Stream<AuthState> get authStateChanges => _auth.onAuthStateChange;
 }
