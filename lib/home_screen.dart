@@ -1,3 +1,5 @@
+import 'package:all_news_information_application/auth_service.dart';
+import 'package:all_news_information_application/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'news_api.dart';
@@ -9,6 +11,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final AuthService _authService = AuthService();
   // final NewsApi _newsApi = NewsApi();
   final NewsApi _newsApi = NewsApi(
     apiKey:
@@ -133,6 +136,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _signOut() async {
+    await _authService.signOut();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
           ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
         ],
         centerTitle: true,
       ),
@@ -235,7 +246,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                     if (article.publishedAt != null)
                                       Text(
                                         // simple formatting: date only
-                                        article.publishedAt!.toLocal().toIso8601String().split('T').first,
+                                        article.publishedAt!
+                                            .toLocal()
+                                            .toIso8601String()
+                                            .split('T')
+                                            .first,
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                   ],

@@ -123,9 +123,17 @@
 // }
 
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'splash_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://zzmlainpucbkvcrtyrrg.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6bWxhaW5wdWNia3ZjcnR5cnJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMjU0NzQsImV4cCI6MjA3NDgwMTQ3NH0.o5t4ZasDGS9S5NKoHz7217nWa2YoSCxTKenuDpJCccc',
+  );
   runApp(const NewsApp());
 }
 
@@ -141,7 +149,7 @@ class NewsApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
