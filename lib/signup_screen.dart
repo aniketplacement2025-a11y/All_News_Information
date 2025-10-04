@@ -20,7 +20,9 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
 
   Future<void> _signup() async {
-    if (_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final response = await _authService.signUp(
