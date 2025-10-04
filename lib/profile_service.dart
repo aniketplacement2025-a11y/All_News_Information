@@ -19,7 +19,7 @@ class ProfileService {
 
       // Then get profile details using email
       final profileData = await _supabase
-          .from('profile')
+          .from('profiles')
           .select('first_name, last_name, phone_no, image_url')
           .eq('email', userData['email'])
           .single()
@@ -42,7 +42,7 @@ class ProfileService {
   }) async {
     try {
       await _supabase
-          .from('profile')
+          .from('profiles')
           .update({
             'first_name': firstName,
             'last_name': lastName,
@@ -78,7 +78,7 @@ class ProfileService {
   Future<Map<String, dynamic>?> getProfileByEmail(String email) async {
     try {
       final profileData = await _supabase
-          .from('profile')
+          .from('profiles')
           .select('*')
           .eq('email', email)
           .single()
@@ -97,7 +97,7 @@ class ProfileService {
   }) async {
     try {
       await _supabase
-          .from('profile')
+          .from('profiles')
           .update({'image_url': imageUrl})
           .eq('email', email);
 

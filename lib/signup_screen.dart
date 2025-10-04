@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -11,13 +12,68 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _emailUsernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _customDomainController = TextEditingController();
   final _authService = AuthService();
+
   bool _isLoading = false;
+
+  // Common domains list
+  final List<String> _commonDomains = [
+    'gmail.com',
+    'yahoo.com',
+    'hotmail.com',
+    'outlook.com',
+    'icloud.com',
+    'protonmail.com',
+    'aol.com',
+    'zoho.com',
+    'yandex.ru',
+    'mail.ru',
+    'gmx.com',
+    'fastmail.com',
+    'tutanota.com',
+    'hushmail.com',
+    'live.com',
+    'msn.com',
+  ];
+
+  final List<String> _customDomains = [];
+
+  String _selectedDomain = 'gmail.com';
+  String _completePhoneNumber = '';
+
+  void _addCustomDomain() {
+    final domain = _customDomainController.text.trim().toLowerCase();
+    if (domain.isEmpty) return;
+
+    // Enhanced domain validation
+    if (!RegExp(
+      r'^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}$',
+    ).hasMatch(domain)) {
+      _showErrorSnackbar('Please enter a valid domain name');
+      return;
+    }
+
+    if (!_customDomains.contains(domain) && !_commonDomains.contains(domain)) {
+      setState(() {
+        _customDomains.add(domain);
+        _selectedDomain = domain;
+        _customDomainController.clear();
+      });
+      FocusScope.of(context).unfocus();
+      _showSuccessSnackbar('Domain added successfully!');
+    } else {
+      _showErrorSnackbar('This domain is already in the list');
+    }
+  }
+
+  String get _fullEmail {
+    return '${_emailUsernameController.text.trim()}@$_selectedDomain';
+  }
 
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) {
@@ -26,7 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
     try {
       final response = await _authService.signUp(
-        email: _emailController.text.trim(),
+        email: _fullEmail,
         password: _passwordController.text,
         firstName: _firstNameController.text.trim().isNotEmpty
             ? _firstNameController.text.trim()
@@ -34,12 +90,9 @@ class _SignupScreenState extends State<SignupScreen> {
         lastName: _lastNameController.text.trim().isNotEmpty
             ? _lastNameController.text.trim()
             : null,
-        phoneNo: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
-            : null,
+        phoneNo: _completePhoneNumber.isNotEmpty ? _completePhoneNumber : null,
       );
       if (response.user != null) {
-        //await _verifyUserInPublicTable(response.user!.id);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -91,6 +144,16 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,31 +190,195 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phoneController,
+
+                    // Phone Number Section with intl_phone_field
+                    const Text(
+                      'Phone Number',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    InternationalPhoneField(
                       decoration: const InputDecoration(
                         labelText: 'Phone Number',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
                       ),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@') || !value.contains('.')) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
+                      initialCountryCode: 'IN',
+                      onChanged: (phone) {
+                        setState(() {
+                          _completePhoneNumber = phone.completeNumber;
+                        });
                       },
                     ),
+                    const SizedBox(height: 12),
+
+                    // Email Section
+                    const Text(
+                      'Email',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        // Email Username
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: _emailUsernameController,
+                            decoration: const InputDecoration(
+                              hintText: 'username',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter email username';
+                              }
+                              if (value.contains('@')) {
+                                return 'Do not include @ symbol';
+                              }
+                              if (!RegExp(
+                                r'^[a-zA-Z0-9._-]+$',
+                              ).hasMatch(value)) {
+                                return 'Only letters, numbers, ., -, _ are allowed';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '@',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        // Domain Dropdown
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedDomain,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 16,
+                              ),
+                            ),
+                            isExpanded: true,
+                            items:
+                                [
+                                      ..._commonDomains.map((domain) {
+                                        return DropdownMenuItem<String>(
+                                          value: domain,
+                                          child: Text(
+                                            domain,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                      if (_customDomains.isNotEmpty) ...[
+                                        const DropdownMenuItem<String>(
+                                          value: 'divider',
+                                          enabled: false,
+                                          child: Divider(),
+                                        ),
+                                        ..._customDomains.map((domain) {
+                                          return DropdownMenuItem<String>(
+                                            value: domain,
+                                            child: Text(
+                                              domain,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontStyle: FontStyle.italic,
+                                                color: Colors.blue,
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ],
+                                    ]
+                                    .where(
+                                      (item) =>
+                                          item.value != 'divider' ||
+                                          _customDomains.isNotEmpty,
+                                    )
+                                    .toList(),
+                            onChanged: (value) {
+                              if (value != null && value.isNotEmpty) {
+                                setState(() {
+                                  _selectedDomain = value;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Custom Domain Section
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _customDomainController,
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'Add custom domain (e.g., organization.com)',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 16,
+                              ),
+                            ),
+                            onFieldSubmitted: (_) => _addCustomDomain(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: _addCustomDomain,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                          ),
+                          icon: const Icon(Icons.add, size: 20),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    if (_customDomains.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: _customDomains.map((domain) {
+                          return Chip(
+                            label: Text(domain),
+                            onDeleted: () {
+                              setState(() {
+                                _customDomains.remove(domain);
+                                if (_selectedDomain == domain) {
+                                  _selectedDomain = _commonDomains.first;
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _passwordController,
@@ -193,5 +420,15 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailUsernameController.dispose();
+    _passwordController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _customDomainController.dispose();
+    super.dispose();
   }
 }

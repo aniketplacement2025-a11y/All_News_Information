@@ -3,6 +3,7 @@ import 'package:all_news_information_application/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'news_api.dart';
+import 'personal_info_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -186,7 +187,11 @@ class _HomeScreenState extends State<HomeScreen> {
               switch (value) {
                 case 'personal_info':
                   // TODO: Implement navigation to Personal Info screen
-                  print('Personal Info selected');
+                  //print('Personal Info selected');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (context) => const PersonalInfoScreen()),
+                  );
                   break;
                 case 'corrections':
                   // TODO: Implement navigation to Corrections screen
