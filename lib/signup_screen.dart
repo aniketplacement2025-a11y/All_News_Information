@@ -93,25 +93,53 @@ class _SignupScreenState extends State<SignupScreen> {
         phoneNo: _completePhoneNumber.isNotEmpty ? _completePhoneNumber : null,
       );
       if (response.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Registration successful! Please check your email for verification.',
-            ),
-          ),
-        );
-        Navigator.of(context).pop();
+        if (mounted) {
+          _showSuccessDialog();
+        }
       }
     } on AuthException catch (e) {
-      _showErrorSnackbar(e.message);
+      if (e.message.toLowerCase().contains('user already registered')) {
+        _showUserExistsDialog();
+      } else {
+        _showErrorSnackbar(e.message);
+      }
     } catch (e) {
-      // ADD THIS CATCH BLOCK
-      _showErrorSnackbar('Registration failed. Please try again.');
+      _showErrorSnackbar('An unexpected error occurred. Please try again.');
       print('Signup error: $e');
     } finally {
-      // ADD THIS FINALLY BLOCK
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  void _showUserExistsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Email Already Registered'),
+        content: const Text(
+          'An account with this email already exists. Please log in.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close the dialog
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close the dialog
+              Navigator.of(
+                context,
+              ).pop(); // Go back to the previous screen (login)
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSuccessDialog() {
@@ -200,7 +228,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    InternationalPhoneField(
+                    IntlPhoneField(
                       decoration: const InputDecoration(
                         labelText: 'Phone Number',
                         border: OutlineInputBorder(),
