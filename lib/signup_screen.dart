@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'auth_service.dart';
+import 'profile_setup_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -94,7 +95,12 @@ class _SignupScreenState extends State<SignupScreen> {
       );
       if (response.user != null) {
         if (mounted) {
-          _showSuccessDialog();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => ProfileSetupScreen(userEmail: _fullEmail),
+            ),
+            (route) => false,
+          );
         }
       }
     } on AuthException catch (e) {
