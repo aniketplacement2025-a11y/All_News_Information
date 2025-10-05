@@ -107,4 +107,27 @@ class ProfileService {
       rethrow;
     }
   }
+
+  // Create a new user profile
+  Future<void> createProfile({
+    required String email,
+    String? firstName,
+    String? lastName,
+    String? phoneNo,
+  }) async {
+    try {
+      await _supabase.from('profiles').insert({
+        'email': email,
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone_no': phoneNo,
+      });
+      //.timeout(const Duration(seconds: 10));
+
+      print('✅ Profile created successfully for: $email');
+    } catch (e) {
+      print('❌ Profile creation error: $e');
+      rethrow;
+    }
+  }
 }

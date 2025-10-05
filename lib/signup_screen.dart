@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'auth_service.dart';
-import 'profile_setup_screen.dart';
+import 'profile_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +19,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _lastNameController = TextEditingController();
   final _customDomainController = TextEditingController();
   final _authService = AuthService();
+  final _profileService = ProfileService();
 
   bool _isLoading = false;
 
@@ -94,13 +95,46 @@ class _SignupScreenState extends State<SignupScreen> {
         phoneNo: _completePhoneNumber.isNotEmpty ? _completePhoneNumber : null,
       );
       if (response.user != null) {
+        // After successful signup, create the profile with retry logic to handle replication delay.
+        bool profileCreated = false;
+        for (int i = 0; i < 10; i++) {
+          // Retry for up to 10 seconds
+          try {
+            await _profileService.createProfile(
+              email: _fullEmail,
+              firstName: _firstNameController.text.trim().isNotEmpty
+                  ? _firstNameController.text.trim()
+                  : null,
+              lastName: _lastNameController.text.trim().isNotEmpty
+                  ? _lastNameController.text.trim()
+                  : null,
+              phoneNo: _completePhoneNumber.isNotEmpty
+                  ? _completePhoneNumber
+                  : null,
+            );
+            profileCreated = true;
+            break; // On success, exit the loop.
+          } on PostgrestException catch (e) {
+            // If it's a foreign key violation, it's likely a replication delay.
+            // Wait and retry. Don't wait on the final attempt.
+            if (e.code == '23503' && i < 9) {
+              print(
+                'Attempt ${i + 1} failed: Foreign key violation. Retrying...',
+              );
+              await Future.delayed(const Duration(seconds: 1));
+            } else {
+              // For any other error, or on the last attempt, rethrow.
+              rethrow;
+            }
+          }
+        }
+
+        if (!profileCreated) {
+          throw Exception('Profile creation failed after multiple retries.');
+        }
+
         if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => ProfileSetupScreen(userEmail: _fullEmail),
-            ),
-            (route) => false,
-          );
+          _showSuccessDialog();
         }
       }
     } on AuthException catch (e) {

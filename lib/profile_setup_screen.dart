@@ -17,7 +17,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final ProfileService _profileService = ProfileService();
   Timer? _pollingTimer;
   int _elapsedSeconds = 0;
-  final int _timeoutSeconds = 15;
+  final int _timeoutSeconds = 30;
 
   @override
   void initState() {
