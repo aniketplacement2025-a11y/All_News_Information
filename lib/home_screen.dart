@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'news_api.dart';
 import 'personal_info_screen.dart';
+import 'corrections_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -190,12 +191,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   //print('Personal Info selected');
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                        builder: (context) => const PersonalInfoScreen()),
+                      builder: (context) => const PersonalInfoScreen(),
+                    ),
                   );
                   break;
                 case 'corrections':
-                  // TODO: Implement navigation to Corrections screen
-                  print('Corrections selected');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const CorrectionsScreen(),
+                    ),
+                  );
                   break;
                 case 'sign_out':
                   _signOut();
