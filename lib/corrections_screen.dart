@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,7 +23,7 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  File? _image;
+  XFile? _image;
   bool _isLoading = false;
   String? _userId;
   String? _userEmail;
@@ -65,7 +66,7 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
 
     if (pickedFile != null) {
       setState(() {
-        _image = File(pickedFile.path);
+        _image = pickedFile;
       });
     }
   }
@@ -77,29 +78,36 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
       });
 
       try {
-        String? imageUrl;
-        if (_image != null) {
-          final user = _authService.currentUser;
-          final userId = user!.id;
-          final fileName = 'profile_$userId.${_image!.path.split('.').last}';
-          final bucket = Supabase.instance.client.storage.from('avatars');
-
-          await bucket.upload(
-            fileName,
-            _image!,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-          );
-
-          imageUrl = bucket.getPublicUrl(fileName);
-        }
-
+        // First, update the text-based profile data
         await _profileService.updateProfile(
           email: _emailController.text,
           firstName: _firstNameController.text,
           lastName: _lastNameController.text,
           phoneNo: _phoneController.text,
-          imageUrl: imageUrl,
         );
+
+        // Then, handle the image upload and update separately
+        if (_image != null) {
+          final user = _authService.currentUser;
+          final userId = user!.id;
+          final imageBytes = await _image!.readAsBytes();
+          final fileName = 'profile_$userId.${_image!.name.split('.').last}';
+          final bucket = Supabase.instance.client.storage.from('avatars');
+
+          await bucket.uploadBinary(
+            fileName,
+            imageBytes,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+
+          final imageUrl = bucket.getPublicUrl(fileName);
+
+          // Make a separate call to update just the image URL
+          await _profileService.updateProfileImage(
+            email: _emailController.text,
+            imageUrl: imageUrl,
+          );
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully!')),
@@ -131,10 +139,15 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
                 child: Column(
                   children: [
                     if (_image != null)
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: FileImage(_image!),
-                      ),
+                      kIsWeb
+                          ? CircleAvatar(
+                              radius: 50,
+                              backgroundImage: NetworkImage(_image!.path),
+                            )
+                          : CircleAvatar(
+                              radius: 50,
+                              backgroundImage: FileImage(File(_image!.path)),
+                            ),
                     TextButton(
                       onPressed: _pickImage,
                       child: const Text('Change Profile Picture'),

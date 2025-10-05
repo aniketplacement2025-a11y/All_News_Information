@@ -41,14 +41,19 @@ class ProfileService {
     String? imageUrl,
   }) async {
     try {
+      final updates = {
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone_no': phoneNo,
+      };
+
+      if (imageUrl != null) {
+        updates['image_url'] = imageUrl;
+      }
+
       await _supabase
           .from('profiles')
-          .update({
-            'first_name': firstName,
-            'last_name': lastName,
-            'phone_no': phoneNo,
-            'image_url': imageUrl,
-          })
+          .update(updates)
           .eq('email', email)
           .timeout(const Duration(seconds: 10));
 
