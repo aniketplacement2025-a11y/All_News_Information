@@ -92,7 +92,9 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
           final userId = user!.id;
           final imageBytes = await _image!.readAsBytes();
           final fileName = 'profile_$userId.${_image!.name.split('.').last}';
-          final bucket = Supabase.instance.client.storage.from('avatars');
+          final bucket = Supabase.instance.client.storage.from(
+            'profile-pictures',
+          );
 
           await bucket.uploadBinary(
             fileName,
