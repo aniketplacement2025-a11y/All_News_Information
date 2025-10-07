@@ -3,8 +3,8 @@ import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'profile_service.dart';
-import 'auth_service.dart';
+import '../service/profile_service.dart';
+import '../service/auth_service.dart';
 
 class CorrectionsScreen extends StatefulWidget {
   const CorrectionsScreen({super.key});

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'profile_service.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
+import 'service/profile_service.dart';
+import 'screen/home_screen.dart';
+import 'screen/login_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   final String userEmail;

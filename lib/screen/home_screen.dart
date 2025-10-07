@@ -1,8 +1,8 @@
-import 'package:all_news_information_application/auth_service.dart';
-import 'package:all_news_information_application/login_screen.dart';
+import 'package:all_news_information_application/service/auth_service.dart';
+import 'package:all_news_information_application/screen/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'news_api.dart';
+import '../news_api.dart';
 import 'personal_info_screen.dart';
 import 'corrections_screen.dart';
 
