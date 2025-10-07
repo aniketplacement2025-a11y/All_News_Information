@@ -16,12 +16,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   // final NewsApi _newsApi = NewsApi();
   final NewsApi _newsApi = NewsApi(
-    apiKey:
-        '39fc8513af0648568fb3d8ca975195d4', // <-- replace or pass from main (avoid hardcoding)
-  );
-  late Future<List<Article>> _articlesFuture;
+    apiKey: '39fc8513af0648568fb3d8ca975195d4',
+  ); //late Future<List<Article>> _articlesFuture;
 
+  List<Article> _articles = [];
   String _selectedCategory = 'general';
+  int _currentPage = 1;
+  int _totalPages = 1;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  static const int _pageSize = 10;
 
   final List<String> _categories = [
     'general',
@@ -40,17 +45,40 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchArticles();
   }
 
-  void _fetchArticles() {
-    _articlesFuture = _newsApi.getTopHeadlines(category: _selectedCategory);
+  Future<void> _fetchArticles({bool resetPage = false}) async {
+    if (resetPage) {
+      setState(() {
+        _currentPage = 1;
+        _articles = [];
+      });
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _newsApi.getTopHeadlines(
+        category: _selectedCategory,
+        pageSize: _pageSize,
+        page: _currentPage,
+      );
+      setState(() {
+        _articles = response.articles;
+        _totalPages = (response.totalResults / _pageSize).ceil();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   Future<void> _refreshArticles() async {
-    setState(() {
-      // _articlesFuture = _newsApi.getTopHeadlines();
-      _fetchArticles();
-    });
-    // wait for completion so RefreshIndicator finishes nicely
-    await _articlesFuture;
+    await _fetchArticles(resetPage: true);
   }
 
   Future<void> _openArticle(String? url) async {
@@ -172,11 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             }).toList(),
             onChanged: (String? newValue) {
-              if (newValue != null) {
+              if (newValue != null && newValue != _selectedCategory) {
                 setState(() {
                   _selectedCategory = newValue;
-                  _fetchArticles();
+                  //_fetchArticles();
                 });
+                _fetchArticles(resetPage: true);
               }
             },
           ),
@@ -226,100 +255,150 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         centerTitle: true,
       ),
-      body: FutureBuilder<List<Article>>(
-        future: _articlesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No articles found.'));
-          } else {
-            final articles = snapshot.data!;
-            return RefreshIndicator(
-              onRefresh: _refreshArticles,
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: articles.length,
-                itemBuilder: (context, index) {
-                  final article = articles[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 10.0,
-                      vertical: 8.0,
-                    ),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _openArticle(article.url),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildImage(article.urlToImage),
-                          Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  article.title,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading && _articles.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Error: $_errorMessage',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
+    if (_articles.isEmpty) {
+      return const Center(child: Text('No articles found.'));
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshArticles,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: _articles.length,
+              itemBuilder: (context, index) {
+                final article = _articles[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 10.0,
+                    vertical: 8.0,
+                  ),
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _openArticle(article.url),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildImage(article.urlToImage),
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                article.title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  article.description.isNotEmpty
-                                      ? article.description
-                                      : 'No description available.',
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                article.description.isNotEmpty
+                                    ? article.description
+                                    : 'No description available.',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    if (article.sourceName.isNotEmpty)
-                                      Text(
-                                        article.sourceName,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  if (article.sourceName.isNotEmpty)
+                                    Text(
+                                      article.sourceName,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    const Spacer(),
-                                    if (article.publishedAt != null)
-                                      Text(
-                                        // simple formatting: date only
-                                        article.publishedAt!
-                                            .toLocal()
-                                            .toIso8601String()
-                                            .split('T')
-                                            .first,
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                    ),
+                                  const Spacer(),
+                                  if (article.publishedAt != null)
+                                    Text(
+                                      // simple formatting: date only
+                                      article.publishedAt!
+                                          .toLocal()
+                                          .toIso8601String()
+                                          .split('T')
+                                          .first,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
-            );
-          }
-        },
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (!_isLoading) _buildPaginationControls(),
+      ],
+    );
+  }
+
+  Widget _buildPaginationControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton.icon(
+            onPressed: _currentPage > 1
+                ? () {
+                    setState(() => _currentPage--);
+                    _fetchArticles();
+                  }
+                : null,
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Previous'),
+          ),
+          Text('Page $_currentPage of $_totalPages'),
+          ElevatedButton.icon(
+            onPressed: _currentPage < _totalPages
+                ? () {
+                    setState(() => _currentPage++);
+                    _fetchArticles();
+                  }
+                : null,
+            label: const Text('Next'),
+            icon: const Icon(Icons.arrow_forward),
+          ),
+        ],
       ),
     );
   }

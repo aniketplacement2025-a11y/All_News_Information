@@ -49,6 +49,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+class NewsApiResponse {
+  final List<Article> articles;
+  final int totalResults;
+
+  NewsApiResponse({required this.articles, required this.totalResults});
+}
+
 /// Simple NewsAPI client. Pass your API key in the constructor
 /// (avoid hardcoding in production).
 class NewsApi {
@@ -61,15 +68,17 @@ class NewsApi {
   });
 
   /// Get top headlines. You can pass country (default 'us'), category, pageSize.
-  Future<List<Article>> getTopHeadlines({
+  Future<NewsApiResponse> getTopHeadlines({
     String country = 'us',
     String? category,
     int pageSize = 20,
+    int page = 1,
   }) async {
     final Map<String, String> query = {
       'apiKey': apiKey,
       'country': country,
       'pageSize': pageSize.toString(),
+      'page': page.toString(),
     };
     if (category != null && category.isNotEmpty) {
       query['category'] = category;
@@ -99,6 +108,7 @@ class NewsApi {
       throw Exception('NewsAPI error: ${data['message'] ?? data['status']}');
     }
 
+    final int totalResults = data['totalResults'] ?? 0;
     final List articlesJson = data['articles'] ?? <dynamic>[];
     final List<Article> articles = articlesJson
         .map((a) => Article.fromJson(a as Map<String, dynamic>))
@@ -106,7 +116,7 @@ class NewsApi {
         .where((a) => a.url.isNotEmpty)
         .toList();
 
-    return articles;
+    return NewsApiResponse(articles: articles, totalResults: totalResults);
   }
 }
 
