@@ -71,13 +71,13 @@ class NewsApi {
   Future<NewsApiResponse> getTopHeadlines({
     String country = 'us',
     String? category,
-    int pageSize = 20,
+    // int pageSize = 10,
     int page = 1,
   }) async {
     final Map<String, String> query = {
       'apiKey': apiKey,
       'country': country,
-      'pageSize': pageSize.toString(),
+      // 'pageSize': pageSize.toString(),
       'page': page.toString(),
     };
     if (category != null && category.isNotEmpty) {
@@ -85,7 +85,8 @@ class NewsApi {
     }
 
     final uri = Uri.parse(baseUrl).replace(queryParameters: query);
-
+    /*like  https://newsapi.org/v2/top-headlines?apiKey=39fc8513af0648568fb3d8ca975195d4&country=us&category=general 
+  Url */
     final response = await http
         .get(uri)
         .timeout(

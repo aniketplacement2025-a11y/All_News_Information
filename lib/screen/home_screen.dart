@@ -3,6 +3,7 @@ import 'package:all_news_information_application/screen/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../news_api.dart';
+import 'package:all_news_information_application/widget/pagination_controls.dart';
 import 'personal_info_screen.dart';
 import 'corrections_screen.dart';
 
@@ -61,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final response = await _newsApi.getTopHeadlines(
         category: _selectedCategory,
-        pageSize: _pageSize,
+        // pageSize: _pageSize,
         page: _currentPage,
       );
       setState(() {
@@ -366,40 +367,53 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        if (!_isLoading) _buildPaginationControls(),
+        //if (!_isLoading) _buildPaginationControls(),
+        if (!_isLoading)
+          PaginationControls(
+            currentPage: _currentPage,
+            totalPages: _totalPages,
+            onPreviousPage: () {
+              setState(() => _currentPage--);
+              _fetchArticles();
+            },
+            onNextPage: () {
+              setState(() => _currentPage++);
+              _fetchArticles();
+            },
+          ),
       ],
     );
   }
-
-  Widget _buildPaginationControls() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          ElevatedButton.icon(
-            onPressed: _currentPage > 1
-                ? () {
-                    setState(() => _currentPage--);
-                    _fetchArticles();
-                  }
-                : null,
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Previous'),
-          ),
-          Text('Page $_currentPage of $_totalPages'),
-          ElevatedButton.icon(
-            onPressed: _currentPage < _totalPages
-                ? () {
-                    setState(() => _currentPage++);
-                    _fetchArticles();
-                  }
-                : null,
-            label: const Text('Next'),
-            icon: const Icon(Icons.arrow_forward),
-          ),
-        ],
-      ),
-    );
-  }
 }
+
+  // Widget _buildPaginationControls() {
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+  //     child: Row(
+  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //       children: [
+  //         ElevatedButton.icon(
+  //           onPressed: _currentPage > 1
+  //               ? () {
+  //                   setState(() => _currentPage--);
+  //                   _fetchArticles();
+  //                 }
+  //               : null,
+  //           icon: const Icon(Icons.arrow_back),
+  //           label: const Text('Previous'),
+  //         ),
+  //         Text('Page $_currentPage of $_totalPages'),
+  //         ElevatedButton.icon(
+  //           onPressed: _currentPage < _totalPages
+  //               ? () {
+  //                   setState(() => _currentPage++);
+  //                   _fetchArticles();
+  //                 }
+  //               : null,
+  //           label: const Text('Next'),
+  //           icon: const Icon(Icons.arrow_forward),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }

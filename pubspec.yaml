@@ -43,6 +43,10 @@ dependencies:
   country_code_picker: ^2.0.2
   email_validator: ^2.1.17
 
+  # For Local Database
+  hive: 
+  hive_flutter: 
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -53,7 +57,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-
+  hive_generator:
+  build_runner:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
