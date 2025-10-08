@@ -141,7 +141,13 @@ class Article {
   });
 
   factory Article.fromJson(Map<String, dynamic> json) {
-    final source = json['source'] ?? {};
+    //final source = json['source'] ?? {};
+    final source = json['source'];
+    String sourceName = '';
+    if (source is Map<String, dynamic>) {
+      sourceName = (source['name'] ?? '').toString();
+    }
+
     final published = json['publishedAt'];
     DateTime? when;
     if (published != null) {
@@ -153,9 +159,22 @@ class Article {
       description: (json['description'] ?? '').toString(),
       url: (json['url'] ?? '').toString(),
       urlToImage: (json['urlToImage'] ?? '').toString(),
-      sourceName: (source['name'] ?? '').toString(),
+      //sourceName: (source['name'] ?? '').toString(),
+      sourceName: sourceName,
       author: (json['author'] ?? '').toString(),
       publishedAt: when,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'url': url,
+      'urlToImage': urlToImage,
+      'source': {'name': sourceName},
+      'author': author,
+      'publishedAt': publishedAt?.toIso8601String(),
+    };
   }
 }

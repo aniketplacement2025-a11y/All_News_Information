@@ -4,6 +4,9 @@ import '../service/auth_service.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
 import '../service/profile_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hive/hive.dart';
+import 'dart:convert';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,32 +25,80 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true); // START LOADING
-      try {
-        final response = await _authService.signIn(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-        if (response.user != null) {
-          // VERIFY USER EXISTS IN PUBLIC.USERS TABLE
-          await _verifyUserInPublicTables(response.user!);
+      // setState(() => _isLoading = true); // START LOADING
+      // try {
+      setState(() => _isLoading = true);
 
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+      final connectivityResult = await (Connectivity().checkConnectivity());
+
+      try {
+        if (connectivityResult == ConnectivityResult.none) {
+          // Offline Flow
+          final box = Hive.box('auth_cache');
+          final sessionJson = box.get('session');
+
+          if (sessionJson != null) {
+            final sessionData = jsonDecode(sessionJson as String);
+            final cachedUser = sessionData['user'] != null
+                ? User.fromJson(sessionData['user'])
+                : null;
+
+            if (cachedUser != null &&
+                cachedUser.email == _emailController.text) {
+              // Email matches, grant access for offline mode
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Email does not match cached session or no session found.',
+                  ),
+                ),
+              );
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'No offline session available. Please connect to the internet.',
+                ),
+              ),
+            );
+          }
+        } else {
+          // Online Flow
+          final response = await _authService.signIn(
+            email: _emailController.text,
+            password: _passwordController.text,
           );
+          if (response.user != null) {
+            // VERIFY USER EXISTS IN PUBLIC.USERS TABLE
+            await _verifyUserInPublicTables(response.user!);
+
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
         }
       } on AuthException catch (e) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));
+        //ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       } catch (e) {
         // ADD GENERAL ERROR CATCH
+        // ScaffoldMessenger.of(
+        //   context,
+        // ).showSnackBar(SnackBar(content: Text('Login error: $e')));
+
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Login error: $e')));
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       } finally {
         // STOP LOADING
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }

@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hive/hive.dart';
+import 'dart:convert';
 
 class AuthService {
   final GoTrueClient _auth = Supabase.instance.client.auth;
@@ -7,7 +9,16 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return await _auth.signInWithPassword(email: email, password: password);
+    final response = await _auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    if (response.session != null) {
+      final box = await Hive.openBox('auth_cache');
+      // Storing the session details
+      box.put('session', jsonEncode(response.session!.toJson()));
+    }
+    return response;
   }
 
   Future<AuthResponse> signUp({
