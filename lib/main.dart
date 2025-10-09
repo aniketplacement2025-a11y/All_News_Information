@@ -250,11 +250,20 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'splash_screen.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'models/article.dart';
+import 'models/user_preferences.dart';
+import 'models/auth_cache.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
+
+  // Registering Adapters
+  Hive.registerAdapter(ArticleAdapter());
+  Hive.registerAdapter(UserPreferencesAdapter());
+  Hive.registerAdapter(CachedUserAdapter());
+  Hive.registerAdapter(CachedSessionAdapter());
 
   await Hive.openBox('auth_cache');
   await Hive.openBox('user_preferences');
