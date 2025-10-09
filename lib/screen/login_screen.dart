@@ -34,14 +34,21 @@ class _LoginScreenState extends State<LoginScreen> {
       try {
         if (connectivityResult == ConnectivityResult.none) {
           // Offline Flow
-          final box = Hive.box('auth_cache');
-          final sessionJson = box.get('session');
+          // final box = Hive.box('auth_cache');
+          // final sessionJson = box.get('session');
 
-          if (sessionJson != null) {
-            final sessionData = jsonDecode(sessionJson as String);
-            final cachedUser = sessionData['user'] != null
-                ? User.fromJson(sessionData['user'])
-                : null;
+          final box = await Hive.openBox('auth_cache');
+          final userJson = box.get('user');
+
+          // if (sessionJson != null) {
+          //   final sessionData = jsonDecode(sessionJson as String);
+          //   final cachedUser = sessionData['user'] != null
+          //       ? User.fromJson(sessionData['user'])
+          //       : null;
+
+          if (userJson != null) {
+            final userMap = jsonDecode(userJson as String);
+            final cachedUser = User.fromJson(userMap);
 
             if (cachedUser != null &&
                 cachedUser.email == _emailController.text) {

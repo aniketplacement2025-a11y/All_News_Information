@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final response = await _newsApi.getTopHeadlines(
           category: _selectedCategory,
-          // pageSize: _pageSize,
+          pageSize: _pageSize,
           page: _currentPage,
         );
         setState(() {

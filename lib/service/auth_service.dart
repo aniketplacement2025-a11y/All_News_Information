@@ -17,6 +17,9 @@ class AuthService {
       final box = await Hive.openBox('auth_cache');
       // Storing the session details
       box.put('session', jsonEncode(response.session!.toJson()));
+      if (response.user != null) {
+        box.put('user', jsonEncode(response.user!.toJson()));
+      }
     }
     return response;
   }
