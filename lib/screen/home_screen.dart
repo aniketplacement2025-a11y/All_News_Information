@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _isOffline = false;
+  bool _isShowingCachedData = false;
   late StreamSubscription<ConnectivityResult> _connectivitySubscription;
 
   static const int _pageSize = 10;
@@ -147,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _articles = response.articles;
         _totalPages = (response.totalResults / _pageSize).ceil();
         _isLoading = false;
+        _isShowingCachedData = false;
       });
 
       // Cache the articles
@@ -182,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentPage = 1;
         _isLoading = false;
         _errorMessage = null; // Clear previous errors
+        _isShowingCachedData = true;
       });
     } else {
       if (showError) {
@@ -342,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           //Old Drop Down Button
           // IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
           //New Drop Down Button
-          if (!_isOffline)
+          if (!_isShowingCachedData)
             PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
@@ -499,7 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         //if (!_isLoading) _buildPaginationControls(),
         //if (!_isLoading)
-        if (!_isLoading && !_isOffline)
+        if (!_isLoading && _totalPages > 1)
           PaginationControls(
             currentPage: _currentPage,
             totalPages: _totalPages,
