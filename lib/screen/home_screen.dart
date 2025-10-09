@@ -9,6 +9,7 @@ import 'corrections_screen.dart';
 import 'package:hive/hive.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,7 +20,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
-  final NewsApi _newsApi = NewsApi(apiKey: '39fc8513af0648568fb3d8ca975195d4');
+  // final NewsApi _newsApi = NewsApi();
+  final NewsApi _newsApi = NewsApi(
+    apiKey: '39fc8513af0648568fb3d8ca975195d4',
+  ); //late Future<List<Article>> _articlesFuture;
 
   List<Article> _articles = [];
   String _selectedCategory = 'general';
@@ -28,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _isOffline = false;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
 
   static const int _pageSize = 10;
 
@@ -50,83 +54,86 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _connectivitySubscription?.cancel();
+    _connectivitySubscription.cancel();
     super.dispose();
   }
 
-  Future<void> _initialize() async {
-    await _loadPreferences();
+  void _initialize() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
-      _handleConnectivityChange,
+      _updateConnectionStatus,
     );
-    final connectivityResult = await Connectivity().checkConnectivity();
-    _updateStatusAndFetch(connectivityResult);
+    _loadPreferencesAndFetch();
   }
 
-  void _handleConnectivityChange(ConnectivityResult result) {
-    _updateStatusAndFetch(result);
-  }
-
-  void _updateStatusAndFetch(ConnectivityResult result) {
-    final wasOffline = _isOffline;
-    final isOffline = result == ConnectivityResult.none;
-
-    if (wasOffline != isOffline || _articles.isEmpty) {
+  Future<void> _updateConnectionStatus(ConnectivityResult result) async {
+    final newIsOffline = result == ConnectivityResult.none;
+    if (newIsOffline != _isOffline) {
       setState(() {
-        _isOffline = isOffline;
+        _isOffline = newIsOffline;
       });
 
-      if (wasOffline && !isOffline) {
+      if (!newIsOffline) {
+        // We are back online, show a snackbar and refresh the articles
         if (mounted) {
           ScaffoldMessenger.of(context)
-            ..removeCurrentSnackBar()
+            ..hideCurrentSnackBar()
             ..showSnackBar(
               const SnackBar(
-                content: Text('You are back online!'),
+                content: Text('Back online!'),
                 backgroundColor: Colors.green,
               ),
             );
         }
+        await _fetchArticles(resetPage: true);
+      } else {
+        // We are offline, show a snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('You are now offline.'),
+                backgroundColor: Colors.blueGrey,
+              ),
+            );
+        }
       }
-      _fetchArticles(resetPage: true);
     }
   }
 
-  Future<void> _loadPreferences() async {
+  Future<void> _loadPreferencesAndFetch() async {
     final box = await Hive.openBox('user_preferences');
     final lastCategory = box.get('last_category', defaultValue: 'general');
-    if (mounted) {
-      setState(() {
-        _selectedCategory = lastCategory;
-      });
-    }
+    setState(() {
+      _selectedCategory = lastCategory;
+    });
+    _fetchArticles();
   }
 
   Future<void> _fetchArticles({bool resetPage = false}) async {
     if (resetPage) {
-      if (mounted) {
-        setState(() {
-          _currentPage = 1;
-          _articles = [];
-        });
-      }
-    }
-
-    if (mounted) {
       setState(() {
-        _isLoading = true;
-        _errorMessage = null;
+        _currentPage = 1;
+        _articles = [];
       });
     }
 
-    if (_isOffline) {
-      await _loadFromCache();
-    } else {
-      await _loadFromApi();
-    }
-  }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  Future<void> _loadFromApi() async {
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    setState(() {
+      _isOffline = connectivityResult == ConnectivityResult.none;
+    });
+
+    if (_isOffline) {
+      await _loadFromCache(showError: true);
+      return;
+    }
+
+    // Online: Fetch from API
     try {
       final response = await _newsApi.getTopHeadlines(
         category: _selectedCategory,
@@ -142,47 +149,57 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
 
-      final box = await Hive.openBox('news_cache');
+      // Cache the articles
+      final box = Hive.box('news_cache');
       final articlesJson = jsonEncode(
         _articles.map((a) => a.toJson()).toList(),
       );
-      await box.put(_selectedCategory, articlesJson);
+      box.put(_selectedCategory, articlesJson);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Failed to fetch news. Displaying cached data.';
-      });
-      await _loadFromCache();
+      // API call failed, try loading from cache as a fallback
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apologies for the interruption — you\'re offline.'),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+      await _loadFromCache(showError: true);
     }
   }
 
-  Future<void> _loadFromCache() async {
-    final box = await Hive.openBox('news_cache');
+  Future<void> _loadFromCache({bool showError = false}) async {
+    // Assuming the box is already open.
+    final box = Hive.box('news_cache');
     final articlesJson = box.get(_selectedCategory);
 
-    if (!mounted) return;
-
-    if (articlesJson != null && (articlesJson as String).isNotEmpty) {
-      final articlesData = jsonDecode(articlesJson) as List;
+    if (articlesJson != null) {
+      final articlesData = jsonDecode(articlesJson as String) as List;
+      if (!mounted) return;
       setState(() {
         _articles = articlesData.map((data) => Article.fromJson(data)).toList();
-        _totalPages = 1;
+        _totalPages = 1; // Pagination is disabled for cached data
         _currentPage = 1;
+        _isLoading = false;
+        _errorMessage = null; // Clear previous errors
       });
     } else {
-      if (_errorMessage == null) {
+      if (showError) {
+        if (!mounted) return;
         setState(() {
-          _errorMessage = 'You are offline. No cached data available.';
-          _articles = [];
+          _errorMessage =
+              'We can\'t provide services to you. Please check your internet connection.';
+          _articles = []; // Clear articles
+          _isLoading = false;
         });
       }
     }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    // if (mounted) {
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
+    // }
   }
 
   Future<void> _refreshArticles() async {
@@ -289,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(8.0),
           //child: Image.network(
           child: _isOffline
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: Icon(Icons.signal_wifi_off))
               : Image.network(
                   'https://icon.horse/icon/newsapi.org',
                   errorBuilder: (context, error, stackTrace) {
