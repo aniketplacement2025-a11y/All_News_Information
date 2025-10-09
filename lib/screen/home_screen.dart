@@ -7,6 +7,7 @@ import 'package:all_news_information_application/widget/pagination_controls.dart
 import 'personal_info_screen.dart';
 import 'corrections_screen.dart';
 import 'package:hive/hive.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -18,10 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
-  // final NewsApi _newsApi = NewsApi();
-  final NewsApi _newsApi = NewsApi(
-    apiKey: '39fc8513af0648568fb3d8ca975195d4',
-  ); //late Future<List<Article>> _articlesFuture;
+  final NewsApi _newsApi = NewsApi(apiKey: '39fc8513af0648568fb3d8ca975195d4');
 
   List<Article> _articles = [];
   String _selectedCategory = 'general';
@@ -30,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _isOffline = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   static const int _pageSize = 10;
 
@@ -46,85 +45,143 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // _articlesFuture = _newsApi.getTopHeadlines();
-    _loadPreferencesAndFetch();
+    _initialize();
   }
 
-  Future<void> _loadPreferencesAndFetch() async {
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    await _loadPreferences();
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+      _handleConnectivityChange,
+    );
+    final connectivityResult = await Connectivity().checkConnectivity();
+    _updateStatusAndFetch(connectivityResult);
+  }
+
+  void _handleConnectivityChange(ConnectivityResult result) {
+    _updateStatusAndFetch(result);
+  }
+
+  void _updateStatusAndFetch(ConnectivityResult result) {
+    final wasOffline = _isOffline;
+    final isOffline = result == ConnectivityResult.none;
+
+    if (wasOffline != isOffline || _articles.isEmpty) {
+      setState(() {
+        _isOffline = isOffline;
+      });
+
+      if (wasOffline && !isOffline) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..removeCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('You are back online!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+        }
+      }
+      _fetchArticles(resetPage: true);
+    }
+  }
+
+  Future<void> _loadPreferences() async {
     final box = await Hive.openBox('user_preferences');
     final lastCategory = box.get('last_category', defaultValue: 'general');
-    setState(() {
-      _selectedCategory = lastCategory;
-    });
-    _fetchArticles();
+    if (mounted) {
+      setState(() {
+        _selectedCategory = lastCategory;
+      });
+    }
   }
 
   Future<void> _fetchArticles({bool resetPage = false}) async {
     if (resetPage) {
-      setState(() {
-        _currentPage = 1;
-        _articles = [];
-      });
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final connectivityResult = await (Connectivity().checkConnectivity());
-    setState(() {
-      _isOffline = connectivityResult == ConnectivityResult.none;
-    });
-
-    if (_isOffline) {
-      // Offline: Load from cache
-      final box = Hive.box('news_cache');
-      final articlesJson = box.get(_selectedCategory);
-      if (articlesJson != null) {
-        final articlesData = jsonDecode(articlesJson as String) as List;
+      if (mounted) {
         setState(() {
-          _articles = articlesData
-              .map((data) => Article.fromJson(data))
-              .toList();
-          _totalPages = 1;
           _currentPage = 1;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'No cached data for this category. Please connect to the internet to fetch news.';
           _articles = [];
         });
       }
-    } else {
-      // Online: Fetch from API
-      try {
-        final response = await _newsApi.getTopHeadlines(
-          category: _selectedCategory,
-          pageSize: _pageSize,
-          page: _currentPage,
-        );
-        setState(() {
-          _articles = response.articles;
-          _totalPages = (response.totalResults / _pageSize).ceil();
-          _isLoading = false;
-        });
+    }
 
-        // Cache the articles
-        final box = Hive.box('news_cache');
-        final articlesJson = jsonEncode(
-          _articles.map((a) => a.toJson()).toList(),
-        );
-        box.put(_selectedCategory, articlesJson);
-      } catch (e) {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
+    if (_isOffline) {
+      await _loadFromCache();
+    } else {
+      await _loadFromApi();
+    }
+  }
+
+  Future<void> _loadFromApi() async {
+    try {
+      final response = await _newsApi.getTopHeadlines(
+        category: _selectedCategory,
+        pageSize: _pageSize,
+        page: _currentPage,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _articles = response.articles;
+        _totalPages = (response.totalResults / _pageSize).ceil();
+        _isLoading = false;
+      });
+
+      final box = await Hive.openBox('news_cache');
+      final articlesJson = jsonEncode(
+        _articles.map((a) => a.toJson()).toList(),
+      );
+      await box.put(_selectedCategory, articlesJson);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Failed to fetch news. Displaying cached data.';
+      });
+      await _loadFromCache();
+    }
+  }
+
+  Future<void> _loadFromCache() async {
+    final box = await Hive.openBox('news_cache');
+    final articlesJson = box.get(_selectedCategory);
+
+    if (!mounted) return;
+
+    if (articlesJson != null && (articlesJson as String).isNotEmpty) {
+      final articlesData = jsonDecode(articlesJson) as List;
+      setState(() {
+        _articles = articlesData.map((data) => Article.fromJson(data)).toList();
+        _totalPages = 1;
+        _currentPage = 1;
+      });
+    } else {
+      if (_errorMessage == null) {
         setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
+          _errorMessage = 'You are offline. No cached data available.';
+          _articles = [];
         });
       }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
