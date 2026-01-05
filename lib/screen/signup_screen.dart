@@ -313,7 +313,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               if (!RegExp(
                                 r'^[a-zA-Z0-9._-]+$',
                               ).hasMatch(value)) {
-                                return 'Only letters, numbers, ., -, _ are allowed';
+                                return 'Only letters, numbers,.,-, _ are allowed';
                               }
                               return null;
                             },

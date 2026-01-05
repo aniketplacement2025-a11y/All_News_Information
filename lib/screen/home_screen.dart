@@ -14,7 +14,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService();   // Adds User Authentication Functionality to the app.
   // final NewsApi _newsApi = NewsApi();
   final NewsApi _newsApi = NewsApi(
     apiKey: '39fc8513af0648568fb3d8ca975195d4',
@@ -385,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
+// Instead Of Adding Pagination in a Same page Like Below Code I Choose to move with "Pagination_controls.dart".
   // Widget _buildPaginationControls() {
   //   return Padding(
   //     padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
