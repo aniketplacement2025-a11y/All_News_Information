@@ -6,6 +6,10 @@ import '../news_api.dart';
 import 'package:all_news_information_application/widget/pagination_controls.dart';
 import 'personal_info_screen.dart';
 import 'corrections_screen.dart';
+import 'package:hive/hive.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _totalPages = 1;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isOffline = false;
+  bool _isShowingCachedData = false;
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
 
   static const int _pageSize = 10;
 
@@ -42,7 +49,64 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // _articlesFuture = _newsApi.getTopHeadlines();
+    _initialize();
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
+
+  void _initialize() {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+    _loadPreferencesAndFetch();
+  }
+
+  Future<void> _updateConnectionStatus(ConnectivityResult result) async {
+    final newIsOffline = result == ConnectivityResult.none;
+    if (newIsOffline != _isOffline) {
+      setState(() {
+        _isOffline = newIsOffline;
+      });
+
+      if (!newIsOffline) {
+        // We are back online, show a snackbar and refresh the articles
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Back online!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+        }
+        await _fetchArticles(resetPage: true);
+      } else {
+        // We are offline, show a snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('You are now offline.'),
+                backgroundColor: Colors.blueGrey,
+              ),
+            );
+        }
+      }
+    }
+  }
+
+  Future<void> _loadPreferencesAndFetch() async {
+    final box = await Hive.openBox('user_preferences');
+    final lastCategory = box.get('last_category', defaultValue: 'general');
+    setState(() {
+      _selectedCategory = lastCategory;
+    });
     _fetchArticles();
   }
 
@@ -59,23 +123,85 @@ class _HomeScreenState extends State<HomeScreen> {
       _errorMessage = null;
     });
 
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    setState(() {
+      _isOffline = connectivityResult == ConnectivityResult.none;
+    });
+
+    if (_isOffline) {
+      await _loadFromCache(showError: true);
+      return;
+    }
+
+    // Online: Fetch from API
     try {
       final response = await _newsApi.getTopHeadlines(
         category: _selectedCategory,
-        // pageSize: _pageSize,
+        pageSize: _pageSize,
         page: _currentPage,
       );
+
+      if (!mounted) return;
+
       setState(() {
         _articles = response.articles;
         _totalPages = (response.totalResults / _pageSize).ceil();
         _isLoading = false;
+        _isShowingCachedData = false;
       });
+
+      // Cache the articles
+      final box = Hive.box('news_cache');
+      final articlesJson = jsonEncode(
+        _articles.map((a) => a.toJson()).toList(),
+      );
+      box.put(_selectedCategory, articlesJson);
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      if (!mounted) return;
+      // API call failed, try loading from cache as a fallback
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apologies for the interruption — you\'re offline.'),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+      await _loadFromCache(showError: true);
     }
+  }
+
+  Future<void> _loadFromCache({bool showError = false}) async {
+    // Assuming the box is already open.
+    final box = Hive.box('news_cache');
+    final articlesJson = box.get(_selectedCategory);
+
+    if (articlesJson != null) {
+      final articlesData = jsonDecode(articlesJson as String) as List;
+      if (!mounted) return;
+      setState(() {
+        _articles = articlesData.map((data) => Article.fromJson(data)).toList();
+        _totalPages = 1; // Pagination is disabled for cached data
+        _currentPage = 1;
+        _isLoading = false;
+        _errorMessage = null; // Clear previous errors
+        _isShowingCachedData = true;
+      });
+    } else {
+      if (showError) {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage =
+              'We can\'t provide services to you. Please check your internet connection.';
+          _articles = []; // Clear articles
+          _isLoading = false;
+        });
+      }
+    }
+
+    // if (mounted) {
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
+    // }
   }
 
   Future<void> _refreshArticles() async {
@@ -180,12 +306,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Image.network(
-            'https://icon.horse/icon/newsapi.org',
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.article); // Fallback icon
-            },
-          ),
+          //child: Image.network(
+          child: _isOffline
+              ? const Center(child: Icon(Icons.signal_wifi_off))
+              : Image.network(
+                  'https://icon.horse/icon/newsapi.org',
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(Icons.article); // Fallback icon
+                  },
+                ),
         ),
         title: const Text(
           'All News Information',
@@ -206,6 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _selectedCategory = newValue;
                   //_fetchArticles();
                 });
+                final box = Hive.box('user_preferences');
+                box.put('last_category', newValue);
                 _fetchArticles(resetPage: true);
               }
             },
@@ -213,46 +344,47 @@ class _HomeScreenState extends State<HomeScreen> {
           //Old Drop Down Button
           // IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
           //New Drop Down Button
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'personal_info':
-                  // TODO: Implement navigation to Personal Info screen
-                  //print('Personal Info selected');
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const PersonalInfoScreen(),
-                    ),
-                  );
-                  break;
-                case 'corrections':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const CorrectionsScreen(),
-                    ),
-                  );
-                  break;
-                case 'sign_out':
-                  _signOut();
-                  break;
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'personal_info',
-                child: Text('Personal Info'),
-              ),
-              const PopupMenuItem<String>(
-                value: 'corrections',
-                child: Text('Corrections in Personal Info'),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem<String>(
-                value: 'sign_out',
-                child: Text('Sign Out'),
-              ),
-            ],
-          ),
+          if (!_isShowingCachedData)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'personal_info':
+                    // TODO: Implement navigation to Personal Info screen
+                    //print('Personal Info selected');
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PersonalInfoScreen(),
+                      ),
+                    );
+                    break;
+                  case 'corrections':
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const CorrectionsScreen(),
+                      ),
+                    );
+                    break;
+                  case 'sign_out':
+                    _signOut();
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'personal_info',
+                  child: Text('Personal Info'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'corrections',
+                  child: Text('Corrections in Personal Info'),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'sign_out',
+                  child: Text('Sign Out'),
+                ),
+              ],
+            ),
         ],
         centerTitle: true,
       ),
@@ -368,17 +500,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         //if (!_isLoading) _buildPaginationControls(),
-        if (!_isLoading)
+        //if (!_isLoading)
+        if (!_isLoading && _totalPages > 1)
           PaginationControls(
             currentPage: _currentPage,
             totalPages: _totalPages,
             onPreviousPage: () {
-              setState(() => _currentPage--);
-              _fetchArticles();
+              if (_currentPage > 1) {
+                setState(() => _currentPage--);
+                _fetchArticles();
+              }
             },
             onNextPage: () {
-              setState(() => _currentPage++);
-              _fetchArticles();
+              if (_currentPage < _totalPages) {
+                setState(() => _currentPage++);
+                _fetchArticles();
+              }
             },
           ),
       ],
