@@ -333,7 +333,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         Expanded(
                           flex: 3,
                           child: DropdownButtonFormField<String>(
-                            value: _selectedDomain,
+                            initialValue: _selectedDomain,
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(

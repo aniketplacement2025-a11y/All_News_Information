@@ -9,7 +9,6 @@ import 'corrections_screen.dart';
 import 'package:hive/hive.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class HomeScreen extends StatefulWidget {

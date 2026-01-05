@@ -15,8 +15,6 @@ class ProfileService {
           .single()
           .timeout(const Duration(seconds: 10));
 
-      if (userData == null) return null;
-
       // Then get profile details using email
       final profileData = await _supabase
           .from('profiles')
